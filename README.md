@@ -1,20 +1,108 @@
 
-#Utilisation des GPU/MIG sur Openshift :
+## Utilisation des GPU/MIG sur Openshift :
 
-#Gestion de la configuration des MIG :
+#### Comment requêter un type de ressource GPU ?
 
-“The NVIDIA GPU Operator version 1.7.0 and above enables OpenShift Container Platform administrators to dynamically reconfigure the geometry of the MIG partitioning. The geometry of the MIG partitioning is how hardware resources are bound to MIG instances, so it directly influences their performance and the number of instances that can be allocated. The A100-40GB, for example, has eight compute units and 40 GB of RAM. When the MIG mode is enabled, the eighth instance is reserved for resource management.”
+Une ressource GPU est considérée comme une ressource étendue et présentée sous le nom **nvidia.com/gpu**.
 
-Peut-être serait-il intéressant d’expliciter plus avant ce que signifie ‘reconfiguration dynamique’
+Un pod va utiliser les champs spec/resources/limits et/ou spec/resources/requests pour demander des GPU (comme pour les ressources standards : CPU, mémoire, ...).
 
-la reconfiguration dynamique des MIG sur un noeud se concrétise par l'application d'un label sur le noeud qui spécifie le profil voulu (nvidia.com/mig.config)
-le temps de reconfiguration n'est pas précisé (à ne pas confondre dans la doc avec les 10-20 min pour changer le mode global single/mixed)
-il semblerait logique et au vu de la node ci dessus, que la reconfiguration du profil des MIG sur un noeud nécessite le drain du noeud (ou du moins l'éviction des pods qui utilisent déjà des MIG sur ce noeud)
-en effet, cela serait incohérent d'avoir des noeuds qui utilisent des MIG existants alors que l'on va changer ces MIG
+    ex: apiVersion: v1
+    kind: Pod
+    metadata:
+      name: cuda-vectoradd
+    spec:
+     restartPolicy: OnFailure
+     containers:
+     - name: cuda-vectoradd
+       image: "nvidia/samples:vectoradd-cuda11.2.1"
+       resources:
+         limits:
+           nvidia.com/gpu: 1
 
-The node must be free (drained) of GPU workloads before any reconfiguration is triggered. For guidance on draining a node see, the OpenShift Container Platform documentation Understanding how to evacuate pods on nodes.
+Il est aussi possible de rajouter des node selector mais ils ne serviront qu'à rajouter une contrainte supplémentaire sur les noeuds sur lesquels sera cherché la ressource GPU demandée.
 
-#Monitoring des GPU :
+      nodeSelector:
+        nvidia.com/gpu.product: A100-SXM4-40GB-MIG-1g.5gb
+
+Sur les noeuds qui ont des GPU disponibles, la ressource **nvidia.com/gpu** sera décrite comme pour une ressource CPU :   
+ * Capacity: nombre de ressources physiques   
+ * Allocatable: nombre de ressources pouvant être utilisée (hors réservations systèmes)   
+ * Allocated Resources: nombre de resource déjà réservée sur le noeud.   
+
+#### Comment configurer les MIG ?
+
+Un profil différent peut-être appliqué sur chaque noeud pour spécifier le partitionnement des GPU présents.
+
+Dans un "config map", sera défini l'ensemble des profils de partitionnement possibles.
+
+Ensuite, il faudra appliquer le profil voulu sur un noeud en rajoutant le label "nvidia.com/mig.config=<mig profil>" sur ce noeud.
+ 
+La reconfiguration dynamique des MIG sur un noeud se concrétise par l'application d'un label sur le noeud qui spécifie le profil voulu :    
+
+     oc label node/$NODE_NAME nvidia.com/mig.config=$MIG_PROFIL    
+
+Le temps de reconfiguration n'est pas précisé (à ne pas confondre dans la doc avec les 10-20 min pour changer le mode global single/mixed).
+
+Il faut drainer le noeud (ou du moins l'éviction des pods qui utilisent déjà des MIG sur ce noeud) avant de reconfigurer le partitionnement.
+ 
+#### Quel partitionnement possible pour les MIG ?
+
+Selon le type de GPU, le GPU pourra être découpé en plus petites unités : 
+
+ * exemple : sur le A100-40GB, il est possible de le découper en 8 sous unités, la 8ème unité sera réservée pour le partitionnement.
+
+Chaque GPU pourra être partitionné différement.
+ 
+Un exemple de profils de partitionnement : 
+ 
+     apiVersion: v1
+     kind: ConfigMap
+     metadata:
+       name: mig-parted-config
+       namespace: gpu-operator-resources
+     data:
+       config.yaml: |
+         version: v1
+         mig-configs:
+           all-1g.5gb:
+             - devices: all
+               mig-enabled: true
+               mig-devices:
+                 "1g.5gb": 7
+
+           profil1:
+             - devices: 0
+               mig-enabled: true
+               mig-devices:
+                 "1g.5gb": 2
+                 "2g.10gb": 1
+                 "3g.20gb": 1
+
+             - devices: 1
+               mig-enabled: true
+               mig-devices:
+                 "1g.5gb": 5
+                 "2g.10gb": 1
+ 
+#### Comment requêter un type de ressource MIG ?
+ 
+Vous aller alors avoir une nouvelle ressource représentant le ou les mig sur le noeud (en remplacement de nvidia.com/gpu)
+
+Cette ressource sera donc utilisable comme un GPU (spec/resources/...) :
+ 
+    resources:
+      requests:
+        nvidia.com/mig-2g.10gb: 1
+
+La ressource nvidia.com/mig-2g.10gb sera vue aussi comme une ressource étendue sur le noeud : 
+ 
+     allocatable : 
+        "nvidia.com/mig-2g.10gb": "3",
+
+Il faut donc les droits de drain et de labellisation de noeud pour partitionner un GPU.
+           
+# Monitoring des GPU :
 
 « Enable the GPU Operator Dashboard
 
@@ -33,7 +121,7 @@ Cartographie des GPUs opérées avec Openshift :
 J’ai tendance à penser qu’avec ce Node Feature Discovery Operateur, nous avons accès à la dexscription des GPUs et Instances MIG déployées ?
 Il serait intéressant de décrire les fonctionalités offertes
  
-il y a déjà via le oc describe node, la vision des ressources (capacity, allocatable, request) des GPU/MIG comme pour les cpu, ils sont vus comme des ressources étendues
+il y a déjà via le oc describe node, la vision des ressources (capacity, allocatable, allocated) des GPU/MIG comme pour les cpu, ils sont vus comme des ressources étendues
 après, il est possible de lancer des commandes spécifiques sur les daemon set de l'operateur gpu pour voir d'autres détails
 
 Access à NGC (air gapped ou Proxy Cache) :
@@ -96,58 +184,9 @@ quels outils de monitoring du gpu ?
 
 des alertes sont configurées sur le status des GPU et les daemonset de l'opérateur GPU peuvent être utilisés pour lancer la commande nvidia-smi
 
-comment un utilisateur requête un type de ressources gpu (requests, node selector, labels ?)
 
-par défault, un pod va utiliser les infos spec/resources/limits et/ou request pour demander des gpu (comme pour les cpu)
 
-ex: apiVersion: v1
-kind: Pod
-metadata:
-  name: cuda-vectoradd
-spec:
- restartPolicy: OnFailure
- containers:
- - name: cuda-vectoradd
-   image: "nvidia/samples:vectoradd-cuda11.2.1"
-   resources:
-     limits:
-       nvidia.com/gpu: 1
 
-mais il est aussi possible de rajouter des node selector mais ils ne serviront qu'à rajouter une contrainte supplémentaire sur les noeuds sur lesquels sera cherché la ressource gpu demandée
-
-sur les noeuds qui ont des gpu prêts, la ressource nvidia.com/gpu sera défini en capacity et allocatable comme les cpu
-
-comment on partitionne les gpu sur les noeuds (en mig, on peut partionner différenment sur les noeuds, pas besoin de noeuds identiques)
-
-il est possible de configurer un GPU en MIG hétérogènes (cf https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/openshift/mig-ocp.html#configuring-mig-devices-in-openshift)
-
-pour appliquer la configuration, il faut labelliser le noeud avec le profil de partionning défini
-oc label node/$NODE_NAME nvidia.com/mig.config=$MIG_CONFIGURATION --overwrite
-donc le partitionnement peut être différent sur chaque noeud
-
-vous aller alors avoir une nouvelle ressource représentant le ou les mig sur le noeud (en remplacement de nvidia.com/gpu)
-
-allocatable : 
-"nvidia.com/mig-2g.10gb": "3",
-cette ressource sera donc utilisable comme un gpu (spec/resources/...)
-    resources:
-      limits:
-        nvidia.com/mig-2g.10gb: 1
-si les noeuds sont configurés de manière homogène (même profil MIG sur un noeud : single versus mixed)
-vous pouvez requeter des gpu et rajouter un node selector pour spécifier quel type de MIG vous recherchez
-    resources:
-      limits:
-        nvidia.com/gpu: 1
-  nodeSelector:
-    nvidia.com/gpu.product: A100-SXM4-40GB-MIG-1g.5gb
-quels impacts pour changer les partioning mig  (temps, drain node, ...)
-
-The node must be free (drained) of GPU workloads before any reconfiguration is triggered. For guidance on draining a node see, the OpenShift Container Platform documentation Understanding how to evacuate pods on nodes.
-Il faut donc les droits de drain de node (admin) pour reconfigurer un GPU.
-
-qui peut faire le changement de partitioning (profil admin, ...)
-
-           Il faut avoir les droits de labelliser les noeuds et les droits de créer le profil de MIG (si besoin) donc des droits sur l'opérateur GPU.
 
 peut-on monter a 2T de mémoire sur 1 pod (ou du moins 250G)
 
