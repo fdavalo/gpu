@@ -1,5 +1,7 @@
 
-Gestion de la configuration MIG :
+#Utilisation des GPU/MIG sur Openshift :
+
+#Gestion de la configuration des MIG :
 
 “The NVIDIA GPU Operator version 1.7.0 and above enables OpenShift Container Platform administrators to dynamically reconfigure the geometry of the MIG partitioning. The geometry of the MIG partitioning is how hardware resources are bound to MIG instances, so it directly influences their performance and the number of instances that can be allocated. The A100-40GB, for example, has eight compute units and 40 GB of RAM. When the MIG mode is enabled, the eighth instance is reserved for resource management.”
 
@@ -12,7 +14,7 @@ en effet, cela serait incohérent d'avoir des noeuds qui utilisent des MIG exist
 
 The node must be free (drained) of GPU workloads before any reconfiguration is triggered. For guidance on draining a node see, the OpenShift Container Platform documentation Understanding how to evacuate pods on nodes.
 
-GPU monitoring :
+#Monitoring des GPU :
 
 « Enable the GPU Operator Dashboard
 
@@ -24,7 +26,7 @@ Et la solution avec Openshift autorise-t-elle cette architecture avec Promotheus
  
 les métriques GPU sont bien intégrablent sur le prometheus d'openshift (les métriques DCGM), mais le grafana de base n'est pas customisable à ma connaissance mais via l'opérateur grafana, il est possible de rajouter une instance grafana qui pointe sur le prometheus déjà déployé (avec l'opérateur de monitoring) et dans lequel, des dashboard utilisant ces métriques peuvent être installés 
 
-Cartographie des GPUs oéprées avec Openshift :
+Cartographie des GPUs opérées avec Openshift :
 
 « Installing the Node Feature Discovery (NFD) Operator …”
 
