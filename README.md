@@ -40,7 +40,7 @@ La reconfiguration dynamique des MIG sur un noeud se concrétise par l'applicati
 
      oc label node/$NODE_NAME nvidia.com/mig.config=$MIG_PROFIL    
 
-_Le temps de reconfiguration n'est pas précisé_ (à ne pas confondre dans la doc avec les 10-20 min pour changer le mode global single/mixed).
+_Le temps de reconfiguration n'est pas précisé mais semble rapide (15s), par contre le temps d'éjection des pods est plus long_ (à ne pas confondre dans la doc avec les 10-20 min pour changer le mode global single/mixed).
 
 Il faut drainer le noeud (ou du moins l'éviction des pods qui utilisent déjà des MIG sur ce noeud) avant de reconfigurer le partitionnement.
  
@@ -149,11 +149,13 @@ Les gpu (et ressources MIG) sont considérées comme des ressources étendues et
               hard:
                 requests.nvidia.com/gpu: 1
 
-_Pas de confirmation sur la présence ou non des quotas GPU sur la page Quota du namespace._
+En cours de rajout dans la page quota de la console.
 
-_Pas de confirmation sur la prise en compte des ressources étendues via l'opérateur de Cost management._
-
+L'opérateur de Cost Management n'utilise que les métriques CPU, mémoire et stockage.
+Mais comme on a des Extended Resources pour les GPUs, il devrait être possible de récupérer des métriques similaires et de les utiliser pour le Cost Management. Demande en cours au PM du cost management.
+ 
 ## Cartographie des GPUs opérées avec Openshift :
 
-_En utilisant le Node Feature Discovery Operateur, il y a définition automatique sur les noeuds des GPUs disponibles._
+Node Feature Discovery applique par défaut le vendor id pour les périphériques PCI, i.e. 10de pour NVIDIA. C'est ce qu'utilise le GPU Operator pour identifier les nodes où déployer les composants.
+Ensuite, le GPU Operator ajoute aussi ses propres labels via le composant GPU Feature Discovery, cf. la liste des labels.
  
