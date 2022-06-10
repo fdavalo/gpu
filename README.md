@@ -1,4 +1,6 @@
-# Quelques questions et réponses sur la prise en compte des GPU/Mig sur Openshift (cf https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/openshift/contents.html)
+# Quelques questions et réponses sur la prise en compte des GPU/Mig sur Openshift 
+
+(https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/openshift/contents.html)
 
 ## Utilisation des GPU/MIG sur Openshift :
 
