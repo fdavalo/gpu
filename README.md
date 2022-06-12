@@ -152,7 +152,7 @@ Les gpu (et ressources MIG) sont considérées comme des ressources étendues et
               hard:
                 requests.nvidia.com/gpu: 1
 
-En cours de rajout dans la page quota de la console.
+En cours de rajout dans la page quota de la console (cible 4.11).
 
 L'opérateur de Cost Management n'utilise que les métriques CPU, mémoire et stockage.
 Mais comme on a des Extended Resources pour les GPUs, il devrait être possible de récupérer des métriques similaires et de les utiliser pour le Cost Management. Demande en cours au PM du cost management.
