@@ -37,7 +37,7 @@ Sur les noeuds qui ont des GPU disponibles, la ressource **nvidia.com/gpu** sera
 
 Un profil différent peut-être appliqué sur chaque noeud pour spécifier le partitionnement des GPU présents.
 
-Dans un "config map", sera défini l'ensemble des profils de partitionnement possibles (cf quel partitionnement avec les MIG pour plus de détail).
+Dans un "config map", sera défini l'ensemble des profils de partitionnement possibles (cf chapitre _Quel partitionnement avec les MIG_ pour plus de détail).
  
 La reconfiguration dynamique des MIG sur un noeud se concrétise par l'application d'un label sur le noeud qui spécifie le profil voulu :    
 
